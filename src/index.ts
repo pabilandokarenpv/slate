@@ -3,13 +3,19 @@ export interface Env {
   ASSETS: Fetcher;
 }
 
-const SYSTEM_PROMPT = `You are Slate, a helpful AI coding assistant. When you write
+const SYSTEM_PROMPT = `You are Kernel AI, a helpful AI coding assistant. When you write
 a runnable HTML, CSS, JS, or React snippet that the user could preview live,
 wrap it in a fenced code block tagged \`artifact-html\`, \`artifact-jsx\`, or
 similar — the UI renders those in a live sandboxed preview panel. Normal code
 examples in other languages (python, rust, etc.) just use a normal fenced
 code block with the language name, no live preview needed for those. Keep
-responses concise and direct.`;
+responses concise and direct.
+
+Note on identity: this chat currently runs on a hosted model as a bridge
+while Kernel AI's own from-scratch model (trained on Kaggle, served via a
+pure-numpy Cloudflare Python Worker) is still being trained up to usable
+quality. If asked what model you are, be honest about this rather than
+claiming to be the from-scratch model.`;
 
 async function handleChat(request: Request, env: Env): Promise<Response> {
   const body = await request.json<{ messages: { role: string; content: string }[] }>();
@@ -42,7 +48,7 @@ function mockStreamResponse(userMessage: string): Response {
     `You said: "${userMessage}"\n\n` +
     "Here's a live artifact demo:\n\n```artifact-html\n" +
     `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2rem;text-align:center">` +
-    `<h1>Hello from Slate 👋</h1><p>This HTML is rendered live in the sandboxed artifact panel.</p>` +
+    `<h1>Hello from Kernel AI 👋</h1><p>This HTML is rendered live in the sandboxed artifact panel.</p>` +
     `<button onclick="this.textContent='clicked!'">click me</button></body></html>\n` +
     "```\n";
 

@@ -3,28 +3,51 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Slate</title>
+<title>Kernel AI</title>
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div id="app">
+    <div id="sidebar">
+      <div id="brand">Kernel AI</div>
+      <button id="new-chat-btn">+ New chat</button>
+      <div id="session-list"></div>
+      <div id="sidebar-footer">
+        <span>own model, in progress</span>
+      </div>
+    </div>
     <div id="chat-pane">
       <div id="header">
-        <h1>Slate</h1>
-        <span id="subtitle">chat + live artifacts</span>
+        <h1 id="session-title">New chat</h1>
+        <span id="subtitle">chat + live artifacts + kernel code</span>
       </div>
       <div id="messages"></div>
       <form id="input-form">
-        <textarea id="input" placeholder="Ask Slate anything..." rows="1"></textarea>
+        <textarea id="input" placeholder="Ask Kernel AI anything..." rows="1"></textarea>
         <button type="submit" id="send-btn">Send</button>
       </form>
     </div>
-    <div id="artifact-pane" class="hidden">
-      <div id="artifact-header">
-        <span id="artifact-title">Artifact</span>
-        <button id="artifact-close">×</button>
+    <div id="side-panel" class="hidden">
+      <div id="panel-tabs">
+        <button class="panel-tab active" data-panel="artifact">Artifact</button>
+        <button class="panel-tab" data-panel="kernel-code">Kernel Code</button>
+        <button id="panel-close">×</button>
       </div>
-      <iframe id="artifact-frame" sandbox="allow-scripts"></iframe>
+      <div id="artifact-panel" class="panel-view active">
+        <div id="artifact-title-row"><span id="artifact-title">Artifact</span></div>
+        <iframe id="artifact-frame" sandbox="allow-scripts"></iframe>
+      </div>
+      <div id="kernel-code-panel" class="panel-view">
+        <div id="kernel-code-toolbar">
+          <select id="kernel-code-lang">
+            <option value="html">HTML</option>
+            <option value="js">JavaScript</option>
+          </select>
+          <button id="kernel-code-run">▶ Run</button>
+        </div>
+        <textarea id="kernel-code-editor" spellcheck="false" placeholder="// write or paste code here, then Run"></textarea>
+        <iframe id="kernel-code-frame" sandbox="allow-scripts"></iframe>
+      </div>
     </div>
   </div>
   <script src="/app.js"></script>

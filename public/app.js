@@ -2,12 +2,108 @@ const messagesEl = document.getElementById("messages");
 const form = document.getElementById("input-form");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send-btn");
-const artifactPane = document.getElementById("artifact-pane");
-const artifactFrame = document.getElementById("artifact-frame");
-const artifactTitle = document.getElementById("artifact-title");
-const artifactClose = document.getElementById("artifact-close");
+const sessionListEl = document.getElementById("session-list");
+const sessionTitleEl = document.getElementById("session-title");
+const newChatBtn = document.getElementById("new-chat-btn");
+const sidePanelEl = document.getElementById("side-panel");
+const panelCloseEl = document.getElementById("panel-close");
+const artifactFrameEl = document.getElementById("artifact-frame");
+const artifactTitleEl = document.getElementById("artifact-title");
+const kernelCodeEditor = document.getElementById("kernel-code-editor");
+const kernelCodeFrame = document.getElementById("kernel-code-frame");
+const kernelCodeLang = document.getElementById("kernel-code-lang");
+const kernelCodeRunBtn = document.getElementById("kernel-code-run");
 
-let history = []; // {role, content}
+// ---- Sessions (localStorage-backed, each session = {id, title, history}) ----
+const SESS_KEY = "kernel_ai_sessions_v1";
+
+function loadSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(SESS_KEY)) || [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveSessions(list) {
+  localStorage.setItem(SESS_KEY, JSON.stringify(list));
+}
+
+let sessions = loadSessions();
+let activeId = sessions[0]?.id ?? null;
+
+function newSession() {
+  const s = { id: "s" + Date.now(), title: "New chat", history: [] };
+  sessions.unshift(s);
+  activeId = s.id;
+  saveSessions(sessions);
+  renderSessionList();
+  renderActiveSession();
+}
+
+function getActiveSession() {
+  return sessions.find((s) => s.id === activeId);
+}
+
+function renderSessionList() {
+  sessionListEl.innerHTML = "";
+  for (const s of sessions) {
+    const el = document.createElement("div");
+    el.className = "session-item" + (s.id === activeId ? " active" : "");
+    const label = document.createElement("span");
+    label.textContent = s.title;
+    label.style.overflow = "hidden";
+    label.style.textOverflow = "ellipsis";
+    const del = document.createElement("span");
+    del.className = "session-del";
+    del.textContent = "✕";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      sessions = sessions.filter((x) => x.id !== s.id);
+      if (activeId === s.id) activeId = sessions[0]?.id ?? null;
+      saveSessions(sessions);
+      renderSessionList();
+      renderActiveSession();
+    });
+    el.appendChild(label);
+    el.appendChild(del);
+    el.addEventListener("click", () => {
+      activeId = s.id;
+      renderSessionList();
+      renderActiveSession();
+    });
+    sessionListEl.appendChild(el);
+  }
+}
+
+function renderActiveSession() {
+  const s = getActiveSession();
+  messagesEl.innerHTML = "";
+  artifactCounter = 0;
+  Object.keys(artifacts).forEach((k) => delete artifacts[k]);
+  if (!s) {
+    sessionTitleEl.textContent = "New chat";
+    return;
+  }
+  sessionTitleEl.textContent = s.title;
+  for (const m of s.history) {
+    const el = addMessageEl(m.role);
+    el.innerHTML = renderContent(m.content);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+if (sessions.length === 0) {
+  newSession();
+} else {
+  renderSessionList();
+  renderActiveSession();
+}
+
+newChatBtn.addEventListener("click", () => newSession());
+
+// ---- Chat + artifacts ----
+
 let artifactCounter = 0;
 const artifacts = {}; // id -> {code, lang}
 
@@ -43,13 +139,12 @@ function renderContent(text) {
 function openArtifact(id) {
   const art = artifacts[id];
   if (!art) return;
-  artifactPane.classList.remove("hidden");
-  artifactTitle.textContent = `Artifact — ${art.lang}`;
+  showPanel("artifact");
+  artifactTitleEl.textContent = `Artifact — ${art.lang}`;
   if (art.lang === "html") {
-    artifactFrame.srcdoc = art.code;
+    artifactFrameEl.srcdoc = art.code;
   } else {
-    // jsx/js: wrap in a minimal HTML shell with React from CDN for live preview
-    artifactFrame.srcdoc = `<!DOCTYPE html><html><head>
+    artifactFrameEl.srcdoc = `<!DOCTYPE html><html><head>
       <script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>
       <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>
       <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
@@ -65,10 +160,6 @@ messagesEl.addEventListener("click", (e) => {
   }
 });
 
-artifactClose.addEventListener("click", () => {
-  artifactPane.classList.add("hidden");
-});
-
 function addMessageEl(role) {
   const el = document.createElement("div");
   el.className = `msg ${role}`;
@@ -78,7 +169,14 @@ function addMessageEl(role) {
 }
 
 async function sendMessage(text) {
-  history.push({ role: "user", content: text });
+  const s = getActiveSession();
+  if (!s) return;
+  s.history.push({ role: "user", content: text });
+  if (s.history.length === 1) {
+    s.title = text.slice(0, 40) + (text.length > 40 ? "…" : "");
+    sessionTitleEl.textContent = s.title;
+    renderSessionList();
+  }
   const userEl = addMessageEl("user");
   userEl.textContent = text;
 
@@ -90,7 +188,7 @@ async function sendMessage(text) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({ messages: s.history }),
     });
 
     const reader = res.body.getReader();
@@ -125,7 +223,8 @@ async function sendMessage(text) {
         }
       }
     }
-    history.push({ role: "assistant", content: full });
+    s.history.push({ role: "assistant", content: full });
+    saveSessions(sessions);
   } catch (err) {
     assistantEl.textContent = "Error: " + err.message;
   } finally {
@@ -151,5 +250,34 @@ input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     form.requestSubmit();
+  }
+});
+
+// ---- Side panel (Artifact / Kernel Code tabs) ----
+
+function showPanel(name) {
+  sidePanelEl.classList.remove("hidden");
+  document.querySelectorAll(".panel-tab").forEach((t) => t.classList.toggle("active", t.dataset.panel === name));
+  document.getElementById("artifact-panel").classList.toggle("active", name === "artifact");
+  document.getElementById("kernel-code-panel").classList.toggle("active", name === "kernel-code");
+}
+
+document.querySelectorAll(".panel-tab").forEach((tab) => {
+  tab.addEventListener("click", () => showPanel(tab.dataset.panel));
+});
+
+panelCloseEl.addEventListener("click", () => sidePanelEl.classList.add("hidden"));
+
+kernelCodeRunBtn.addEventListener("click", () => {
+  const code = kernelCodeEditor.value;
+  const lang = kernelCodeLang.value;
+  if (lang === "html") {
+    kernelCodeFrame.srcdoc = code;
+  } else {
+    kernelCodeFrame.srcdoc = `<!DOCTYPE html><html><body>
+      <script>
+        try { ${code} } catch (e) { document.body.innerHTML = '<pre style="color:red">' + e + '<\\/pre>'; }
+      <\/script>
+      </body></html>`;
   }
 });
