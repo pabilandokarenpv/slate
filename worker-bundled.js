@@ -9,7 +9,7 @@ async function handleChat(request, env) {
   const body = await request.json();
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...body.messages];
   try {
-    const stream = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", { messages, stream: true });
+    const stream = await env.AI.run("@cf/meta/llama-3.2-3b-instruct", { messages, stream: true });
     return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
   } catch (err) {
     return mockStreamResponse(messages[messages.length - 1] && messages[messages.length - 1].content ? messages[messages.length - 1].content : "", err);

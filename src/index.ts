@@ -16,7 +16,7 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...body.messages];
 
   try {
-    const stream = (await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+    const stream = (await env.AI.run("@cf/meta/llama-3.2-3b-instruct", {
       messages,
       stream: true,
     })) as unknown as ReadableStream;
