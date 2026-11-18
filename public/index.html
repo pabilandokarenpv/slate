@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Slate</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="chat-pane">
+      <div id="header">
+        <h1>Slate</h1>
+        <span id="subtitle">chat + live artifacts</span>
+      </div>
+      <div id="messages"></div>
+      <form id="input-form">
+        <textarea id="input" placeholder="Ask Slate anything..." rows="1"></textarea>
+        <button type="submit" id="send-btn">Send</button>
+      </form>
+    </div>
+    <div id="artifact-pane" class="hidden">
+      <div id="artifact-header">
+        <span id="artifact-title">Artifact</span>
+        <button id="artifact-close">×</button>
+      </div>
+      <iframe id="artifact-frame" sandbox="allow-scripts"></iframe>
+    </div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
