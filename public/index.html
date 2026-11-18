@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Kernel AI</title>
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div id="app">
+    <div id="sidebar-scrim" class="hidden"></div>
     <div id="sidebar">
       <div id="brand">Kernel AI</div>
       <button id="new-chat-btn">+ New chat</button>
@@ -18,8 +19,11 @@
     </div>
     <div id="chat-pane">
       <div id="header">
-        <h1 id="session-title">New chat</h1>
-        <span id="subtitle">chat + live artifacts + kernel code</span>
+        <button id="sidebar-toggle" aria-label="Toggle chat history">☰</button>
+        <div id="header-text">
+          <h1 id="session-title">New chat</h1>
+          <span id="subtitle">chat + live artifacts + kernel code</span>
+        </div>
       </div>
       <div id="messages"></div>
       <form id="input-form">
