@@ -133,7 +133,7 @@ def deploy(bundle_content):
         "metadata": (None, json.dumps(metadata), "application/json"),
         "worker-bundled.js": ("worker-bundled.js", bundle_content, "application/javascript+module"),
     }
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/slate"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/whitekernel"
     resp = requests.put(url, headers={"Authorization": f"Bearer {token}"}, files=files)
     return resp
 

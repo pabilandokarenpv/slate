@@ -16,6 +16,33 @@ const kernelCodeRunBtn = document.getElementById("kernel-code-run");
 const sidebarEl = document.getElementById("sidebar");
 const sidebarToggleBtn = document.getElementById("sidebar-toggle");
 const sidebarScrimEl = document.getElementById("sidebar-scrim");
+const themeToggleBtn = document.getElementById("theme-toggle");
+const themeIconEl = document.getElementById("theme-icon");
+const sidebarArtifactBtn = document.getElementById("sidebar-artifact-btn");
+const sidebarCodeBtn = document.getElementById("sidebar-code-btn");
+
+// ---- Theme (light/dark, localStorage-persisted, defaults to system) ----
+const THEME_KEY = "kernel_ai_theme_v1";
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  themeIconEl.innerHTML = `<use href="#icon-${theme === "light" ? "sun" : "moon"}"/>`;
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const theme = saved || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  applyTheme(theme);
+}
+
+themeToggleBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "light" ? "dark" : "light";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
+
+initTheme();
 
 // ---- Chat + artifacts primitives (declared FIRST: sessions init below
 // calls renderActiveSession, which touches these — declaring them after
@@ -309,6 +336,17 @@ document.querySelectorAll(".panel-tab").forEach((tab) => {
 });
 
 panelCloseEl.addEventListener("click", closePanel);
+
+// Sidebar quick-access: open the side panel directly to a given tab,
+// same as clicking the in-panel tab, just reachable from the sidebar too.
+sidebarArtifactBtn.addEventListener("click", () => {
+  showPanel("artifact");
+  closeSidebarOnMobile();
+});
+sidebarCodeBtn.addEventListener("click", () => {
+  showPanel("kernel-code");
+  closeSidebarOnMobile();
+});
 
 kernelCodeRunBtn.addEventListener("click", () => {
   showPanel("kernel-code");
