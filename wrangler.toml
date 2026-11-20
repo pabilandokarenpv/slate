@@ -1,10 +1,14 @@
-name = "slate"
+name = "whitekernel"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
-
-[ai]
-binding = "AI"
 
 [assets]
 directory = "./public"
 binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "CRON_KV"
+id = "5502baf97cf8428f94bf4f0821e16c97"
+
+[triggers]
+crons = ["*/5 * * * *"]

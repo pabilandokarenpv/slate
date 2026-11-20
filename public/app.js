@@ -15,6 +15,7 @@ const kernelCodeLang = document.getElementById("kernel-code-lang");
 const kernelCodeRunBtn = document.getElementById("kernel-code-run");
 const sidebarEl = document.getElementById("sidebar");
 const sidebarToggleBtn = document.getElementById("sidebar-toggle");
+const sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
 const sidebarScrimEl = document.getElementById("sidebar-scrim");
 const themeToggleBtn = document.getElementById("theme-toggle");
 const themeIconEl = document.getElementById("theme-icon");
@@ -89,7 +90,13 @@ function addMessageEl(role) {
   return el;
 }
 
-// ---- Sessions (localStorage-backed, each session = {id, title, history}) ----
+// Claude-style "responding" indicator: three pulsing dots shown while we
+// wait for the first real token, swapped out the instant content arrives.
+function showTypingIndicator(el) {
+  el.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+}
+
+// ---- Sessions (localStorage-backed, each session = {id, title, history, botId?, projectId?}) ----
 const SESS_KEY = "kernel_ai_sessions_v1";
 
 function loadSessions() {
@@ -107,11 +114,12 @@ function saveSessions(list) {
 let sessions = loadSessions();
 let activeId = sessions[0]?.id ?? null;
 
-function newSession() {
-  const s = { id: "s" + Date.now(), title: "New chat", history: [] };
+function newSession(opts = {}) {
+  const s = { id: "s" + Date.now(), title: "New chat", history: [], botId: opts.botId ?? null };
   sessions.unshift(s);
   activeId = s.id;
   saveSessions(sessions);
+  showView("chat");
   renderSessionList();
   renderActiveSession();
   closeSidebarOnMobile();
@@ -145,6 +153,7 @@ function renderSessionList() {
     el.appendChild(del);
     el.addEventListener("click", () => {
       activeId = s.id;
+      showView("chat");
       renderSessionList();
       renderActiveSession();
       closeSidebarOnMobile();
@@ -179,7 +188,7 @@ if (sessions.length === 0) {
 
 newChatBtn.addEventListener("click", () => newSession());
 
-// ---- Responsive sidebar (hamburger on tablet/mobile) ----
+// ---- Responsive sidebar (overlay drawer on tablet/mobile) ----
 
 function isNarrow() {
   return window.innerWidth <= 900;
@@ -199,10 +208,22 @@ function closeSidebarOnMobile() {
   if (isNarrow()) closeSidebar();
 }
 
+// The toggle button needs two distinct icons, not one icon that just
+// "looks pressed" — closed shows a plain sidebar glyph (click to reveal),
+// open shows the same glyph with a collapse arrow (click to hide), so the
+// icon itself communicates what the click will do either way.
+function updateSidebarToggleIcon() {
+  const open = isNarrow() ? sidebarEl.classList.contains("open") : true;
+  sidebarToggleIcon.innerHTML = `<use href="#icon-sidebar-${open ? "open" : "closed"}"/>`;
+}
+
 sidebarToggleBtn.addEventListener("click", () => {
   sidebarEl.classList.contains("open") ? closeSidebar() : openSidebar();
+  updateSidebarToggleIcon();
 });
-sidebarScrimEl.addEventListener("click", closeSidebar);
+sidebarScrimEl.addEventListener("click", () => { closeSidebar(); updateSidebarToggleIcon(); });
+window.addEventListener("resize", updateSidebarToggleIcon);
+updateSidebarToggleIcon();
 
 function openArtifact(id) {
   const art = artifacts[id];
@@ -241,14 +262,15 @@ async function sendMessage(text) {
   userEl.textContent = text;
 
   const assistantEl = addMessageEl("assistant");
-  assistantEl.textContent = "…";
+  showTypingIndicator(assistantEl);
 
   sendBtn.disabled = true;
   try {
+    const bot = s.botId ? getBots().find((b) => b.id === s.botId) : null;
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: s.history }),
+      body: JSON.stringify({ messages: s.history, system: bot?.instructions }),
     });
 
     const reader = res.body.getReader();
@@ -319,6 +341,7 @@ input.addEventListener("keydown", (e) => {
 // ---- Side panel (Artifact / Kernel Code tabs) ----
 
 function showPanel(name) {
+  showView("chat");
   sidePanelEl.classList.remove("hidden");
   document.body.classList.add("panel-open-mobile");
   document.querySelectorAll(".panel-tab").forEach((t) => t.classList.toggle("active", t.dataset.panel === name));
@@ -337,8 +360,6 @@ document.querySelectorAll(".panel-tab").forEach((tab) => {
 
 panelCloseEl.addEventListener("click", closePanel);
 
-// Sidebar quick-access: open the side panel directly to a given tab,
-// same as clicking the in-panel tab, just reachable from the sidebar too.
 sidebarArtifactBtn.addEventListener("click", () => {
   showPanel("artifact");
   closeSidebarOnMobile();
@@ -363,8 +384,232 @@ kernelCodeRunBtn.addEventListener("click", () => {
   }
 });
 
+// ---- Top-level nav: Chat / Projects / Bots / Cron Jobs ----
+// Chat is "no feature-view active" (the default chat-pane + side-panel
+// layout); the other three are full-pane views that replace it.
+const navButtons = [
+  document.getElementById("nav-projects-btn"),
+  document.getElementById("nav-bots-btn"),
+  document.getElementById("nav-cron-btn"),
+];
+const featureViews = {
+  projects: document.getElementById("projects-view"),
+  bots: document.getElementById("bots-view"),
+  cron: document.getElementById("cron-view"),
+};
+
+function showView(name) {
+  const chatPane = document.getElementById("chat-pane");
+  const isFeature = name !== "chat";
+  chatPane.style.display = isFeature ? "none" : "flex";
+  if (isFeature) closePanel();
+  Object.entries(featureViews).forEach(([k, el]) => el.classList.toggle("active", k === name));
+  navButtons.forEach((b) => b.classList.toggle("nav-active", b.dataset.view === name));
+  if (name === "projects") renderProjects();
+  if (name === "bots") renderBots();
+  if (name === "cron") renderCron();
+}
+
+navButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    showView(btn.dataset.view);
+    closeSidebarOnMobile();
+  });
+});
+
+// ---- Shared modal (used by Projects / Bots / Cron "New" buttons) ----
+const modalScrim = document.getElementById("modal-scrim");
+const modalTitle = document.getElementById("modal-title");
+const modalFields = document.getElementById("modal-fields");
+const modalCancel = document.getElementById("modal-cancel");
+const modalConfirm = document.getElementById("modal-confirm");
+
+function openModal(title, fieldsHtml, onConfirm) {
+  modalTitle.textContent = title;
+  modalFields.innerHTML = fieldsHtml;
+  modalScrim.classList.remove("hidden");
+  const confirmHandler = () => {
+    onConfirm();
+    modalScrim.classList.add("hidden");
+    modalConfirm.removeEventListener("click", confirmHandler);
+  };
+  modalConfirm.addEventListener("click", confirmHandler);
+  modalFields.querySelector("input, textarea")?.focus();
+}
+
+modalCancel.addEventListener("click", () => modalScrim.classList.add("hidden"));
+modalScrim.addEventListener("click", (e) => { if (e.target === modalScrim) modalScrim.classList.add("hidden"); });
+
+// ---- Projects (localStorage-backed: group chats, shared instructions) ----
+const PROJECTS_KEY = "kernel_ai_projects_v1";
+function getProjects() { try { return JSON.parse(localStorage.getItem(PROJECTS_KEY)) || []; } catch { return []; } }
+function saveProjects(list) { localStorage.setItem(PROJECTS_KEY, JSON.stringify(list)); }
+
+function renderProjects() {
+  const grid = document.getElementById("projects-grid");
+  const projects = getProjects();
+  if (projects.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <svg class="icon" viewBox="0 0 24 24"><use href="#icon-projects"/></svg>
+      <p>No projects yet. Group related chats together with shared instructions.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = projects.map((p) => `
+    <div class="feature-card" data-id="${p.id}" data-kind="project">
+      <button class="card-del" data-del="${p.id}" data-kind="project"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#icon-trash"/></svg></button>
+      <div class="card-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-projects"/></svg></div>
+      <div class="card-title">${escapeHtml(p.name)}</div>
+      <div class="card-sub">${escapeHtml(p.instructions || "No instructions set")}</div>
+      <span class="card-pill">${sessions.filter((s) => s.projectId === p.id).length} chats</span>
+    </div>
+  `).join("");
+}
+
+document.getElementById("projects-new-btn").addEventListener("click", () => {
+  openModal("New project", `
+    <div class="modal-field"><label>Name</label><input id="f-name" placeholder="e.g. Kernel-lang docs" /></div>
+    <div class="modal-field"><label>Instructions (optional)</label><textarea id="f-instructions" rows="3" placeholder="Shared context/instructions for every chat in this project"></textarea></div>
+  `, () => {
+    const name = document.getElementById("f-name").value.trim();
+    if (!name) return;
+    const instructions = document.getElementById("f-instructions").value.trim();
+    const projects = getProjects();
+    projects.unshift({ id: "p" + Date.now(), name, instructions });
+    saveProjects(projects);
+    renderProjects();
+  });
+});
+
+document.getElementById("projects-grid").addEventListener("click", (e) => {
+  const delBtn = e.target.closest("[data-del]");
+  if (delBtn) {
+    e.stopPropagation();
+    saveProjects(getProjects().filter((p) => p.id !== delBtn.dataset.del));
+    renderProjects();
+    return;
+  }
+  const card = e.target.closest(".feature-card");
+  if (card) {
+    newSession({ projectId: card.dataset.id });
+  }
+});
+
+// ---- Bots (localStorage-backed: custom persona + instructions, used as
+// the "system" context sent to the model for any chat started from them) ----
+const BOTS_KEY = "kernel_ai_bots_v1";
+function getBots() { try { return JSON.parse(localStorage.getItem(BOTS_KEY)) || []; } catch { return []; } }
+function saveBots(list) { localStorage.setItem(BOTS_KEY, JSON.stringify(list)); }
+
+function renderBots() {
+  const grid = document.getElementById("bots-grid");
+  const bots = getBots();
+  if (bots.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <svg class="icon" viewBox="0 0 24 24"><use href="#icon-bots"/></svg>
+      <p>No bots yet. Create a custom bot with its own persona and instructions.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = bots.map((b) => `
+    <div class="feature-card" data-id="${b.id}" data-kind="bot">
+      <button class="card-del" data-del="${b.id}" data-kind="bot"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#icon-trash"/></svg></button>
+      <div class="card-icon">${b.emoji || "🤖"}</div>
+      <div class="card-title">${escapeHtml(b.name)}</div>
+      <div class="card-sub">${escapeHtml(b.instructions || "No instructions set")}</div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("bots-new-btn").addEventListener("click", () => {
+  openModal("New bot", `
+    <div class="modal-field"><label>Name</label><input id="f-name" placeholder="e.g. Code Reviewer" /></div>
+    <div class="modal-field"><label>Emoji (optional)</label><input id="f-emoji" placeholder="🤖" maxlength="4" /></div>
+    <div class="modal-field"><label>Instructions</label><textarea id="f-instructions" rows="4" placeholder="How should this bot behave? e.g. Always answer in short bullet points."></textarea></div>
+  `, () => {
+    const name = document.getElementById("f-name").value.trim();
+    if (!name) return;
+    const emoji = document.getElementById("f-emoji").value.trim();
+    const instructions = document.getElementById("f-instructions").value.trim();
+    const bots = getBots();
+    bots.unshift({ id: "b" + Date.now(), name, emoji, instructions });
+    saveBots(bots);
+    renderBots();
+  });
+});
+
+document.getElementById("bots-grid").addEventListener("click", (e) => {
+  const delBtn = e.target.closest("[data-del]");
+  if (delBtn) {
+    e.stopPropagation();
+    saveBots(getBots().filter((b) => b.id !== delBtn.dataset.del));
+    renderBots();
+    return;
+  }
+  const card = e.target.closest(".feature-card");
+  if (card) {
+    newSession({ botId: card.dataset.id });
+  }
+});
+
+// ---- Cron Jobs (real server-side scheduling via /api/cron + the Worker's
+// own Cron Trigger — not a client-side timer, these keep running even if
+// this tab is fully closed) ----
+async function renderCron() {
+  const grid = document.getElementById("cron-grid");
+  grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>Loading…</p></div>`;
+  try {
+    const res = await fetch("/api/cron");
+    const { jobs } = await res.json();
+    if (!jobs || jobs.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <svg class="icon" viewBox="0 0 24 24"><use href="#icon-cron"/></svg>
+        <p>No scheduled jobs yet. A job keeps running on our server every N minutes, even with this closed.</p>
+      </div>`;
+      return;
+    }
+    grid.innerHTML = jobs.map((j) => `
+      <div class="feature-card" data-id="${j.id}" data-kind="cron">
+        <button class="card-del" data-del="${j.id}" data-kind="cron"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#icon-trash"/></svg></button>
+        <div class="card-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-cron"/></svg></div>
+        <div class="card-title">every ${j.scheduleMinutes} min</div>
+        <div class="card-sub">${escapeHtml(j.prompt)}</div>
+        ${j.lastResult ? `<div class="card-sub" style="margin-top:6px;opacity:0.7">↳ ${escapeHtml(j.lastResult.slice(0, 80))}</div>` : `<span class="card-pill">not run yet</span>`}
+      </div>
+    `).join("");
+  } catch (err) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>Couldn't load cron jobs: ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+document.getElementById("cron-new-btn").addEventListener("click", () => {
+  openModal("New cron job", `
+    <div class="modal-field"><label>Prompt</label><textarea id="f-prompt" rows="3" placeholder="e.g. Summarize today's Kernel-lang commits"></textarea></div>
+    <div class="modal-field"><label>Run every (minutes, minimum 5)</label><input id="f-minutes" type="number" min="5" value="60" /></div>
+  `, async () => {
+    const prompt = document.getElementById("f-prompt").value.trim();
+    const scheduleMinutes = parseInt(document.getElementById("f-minutes").value, 10) || 60;
+    if (!prompt) return;
+    await fetch("/api/cron", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt, scheduleMinutes }),
+    });
+    renderCron();
+  });
+});
+
+document.getElementById("cron-grid").addEventListener("click", async (e) => {
+  const delBtn = e.target.closest("[data-del]");
+  if (delBtn) {
+    e.stopPropagation();
+    await fetch(`/api/cron?id=${delBtn.dataset.del}`, { method: "DELETE" });
+    renderCron();
+  }
+});
+
 // ---- Viewport height fix (iOS Safari's 100vh doesn't account for the
-// dynamic address bar / toolbar; measure the real visible height and set
+// dynamic address bar / keyboard; measure the real visible height and set
 // it as a CSS variable instead of relying on vh units everywhere) ----
 function setRealVh() {
   document.documentElement.style.setProperty("--app-height", window.innerHeight + "px");
