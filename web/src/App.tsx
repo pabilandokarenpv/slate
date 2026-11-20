@@ -48,7 +48,7 @@ export default function App() {
   return (
     <div className="relative flex h-[100dvh] overflow-hidden">
       {sidebarOpen && (
-        <div className="fixed inset-0 z-[15] bg-[var(--scrim)] backdrop-blur-[6px] md:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-[15] bg-[var(--scrim)] backdrop-blur-[6px]" onClick={() => setSidebarOpen(false)} />
       )}
 
       <Sidebar

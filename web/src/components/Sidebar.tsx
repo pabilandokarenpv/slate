@@ -42,8 +42,8 @@ export function Sidebar({
 
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-20 flex w-[264px] shrink-0 flex-col gap-3.5 bg-[var(--bg-glass)] p-3 pt-[calc(16px+env(safe-area-inset-top))] pl-[calc(12px+env(safe-area-inset-left))] backdrop-blur-[28px] transition-transform duration-250 ease-[cubic-bezier(.4,0,.2,1)] md:static md:translate-x-0 ${
-        open ? "translate-x-0 shadow-[8px_0_32px_var(--shadow)] md:shadow-none" : "-translate-x-full"
+      className={`fixed inset-y-0 left-0 z-20 flex w-[264px] shrink-0 flex-col gap-3.5 bg-[var(--bg-glass)] p-3 pt-[calc(16px+env(safe-area-inset-top))] pl-[calc(12px+env(safe-area-inset-left))] backdrop-blur-[28px] transition-transform duration-250 ease-[cubic-bezier(.4,0,.2,1)] ${
+        open ? "translate-x-0 shadow-[8px_0_32px_var(--shadow)]" : "-translate-x-full"
       }`}
     >
       <div className="flex items-center gap-[9px] px-1.5 py-1 text-base font-bold tracking-[-0.015em]">
